@@ -18,6 +18,7 @@ type SessionContext = k4websocket.SessionContext
 type Client struct {
 	wsClient        *k4websocket.Client
 	orderBookClient *subscriptions.OrderBookClient
+	tradesClient    *subscriptions.TradesClient
 }
 
 func DefaultClientOption() *ClientOption {
@@ -48,6 +49,11 @@ func NewClient(ctx context.Context, endpointURL string, handler SessionHandler, 
 		return nil, fmt.Errorf("failed to create websocket client: %w", err)
 	}
 	client.orderBookClient = orderBookClient
+	tradesClient, err := subscriptions.NewTradesClient(client)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create websocket client: %w", err)
+	}
+	client.tradesClient = tradesClient
 	return client, nil
 }
 
@@ -77,6 +83,17 @@ func (c *Client) OrderBook() *subscriptions.OrderBookClient {
 		return nil
 	}
 	return c.orderBookClient
+}
+
+// Trades returns the public trade subscription client.
+//
+// Version:
+//   - 2026-08-17: Added.
+func (c *Client) Trades() *subscriptions.TradesClient {
+	if c == nil {
+		return nil
+	}
+	return c.tradesClient
 }
 
 func (c *Client) Connect(ctx context.Context) error {

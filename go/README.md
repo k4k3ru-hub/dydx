@@ -52,7 +52,7 @@ func main() {
 
 The default REST endpoint is `https://indexer.dydx.trade`.
 
-## WebSocket order book
+## WebSocket market data
 
 Implement `websocket.SessionHandler`, construct a client, then subscribe. The
 example imports the required packages directly:
@@ -76,6 +76,11 @@ err = client.OrderBook().Subscribe(ctx, subscriptions.OrderBookParams{
 	Market:  "BTC-USD",
 	Batched: false,
 })
+
+err = client.Trades().Subscribe(ctx, subscriptions.TradesParams{
+	Market:  "BTC-USD",
+	Batched: false,
+})
 ```
 
 Decode order-book events into `protocol.OrderBookMessage` from
@@ -83,3 +88,7 @@ Decode order-book events into `protocol.OrderBookMessage` from
 snapshot objects (`{"price":"...","size":"..."}`) and incremental tuples
 (`["price","size","offset"]`). The default WebSocket endpoint is
 `wss://indexer.dydx.trade/v4/ws`.
+
+Decode trade events into `protocol.TradesMessage`. Each entry in
+`Contents.Trades` contains the trade ID, creation time and height, side, price,
+size, and type.

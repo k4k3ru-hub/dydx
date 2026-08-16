@@ -13,7 +13,7 @@ type testSessionHandler struct{}
 func (*testSessionHandler) HandleMessage(SessionContext, []byte) {}
 func (*testSessionHandler) HandleClose(SessionContext)           {}
 
-func TestNewClientComposesOrderBookAndPreservesOptions(t *testing.T) {
+func TestNewClientComposesSubscriptionsAndPreservesOptions(t *testing.T) {
 	option := &ClientOption{
 		EndpointURL: "wss://example.test/ws",
 		HTTPHeader: http.Header{
@@ -27,6 +27,9 @@ func TestNewClientComposesOrderBookAndPreservesOptions(t *testing.T) {
 	}
 	if client.OrderBook() == nil {
 		t.Fatal("expected composed order book client")
+	}
+	if client.Trades() == nil {
+		t.Fatal("expected composed trades client")
 	}
 	if option.HTTPHeader.Get("X-Test") != "original" {
 		t.Fatalf("caller-owned option was modified: %+v", option)

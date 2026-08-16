@@ -15,6 +15,7 @@ const (
 	MessageTypeChannelData  = "channel_data"
 
 	ChannelOrderBook = "v4_orderbook"
+	ChannelTrades    = "v4_trades"
 )
 
 // Request is a dYdX Indexer WebSocket subscription request.
@@ -52,6 +53,33 @@ type OrderBookMessage struct {
 type OrderBookContents struct {
 	Bids []PriceLevel `json:"bids"`
 	Asks []PriceLevel `json:"asks"`
+}
+
+// TradesMessage is a typed v4_trades message.
+type TradesMessage struct {
+	Type         string         `json:"type"`
+	ConnectionID string         `json:"connection_id,omitempty"`
+	Channel      string         `json:"channel,omitempty"`
+	MessageID    int64          `json:"message_id,omitempty"`
+	ID           string         `json:"id,omitempty"`
+	Version      string         `json:"version,omitempty"`
+	Contents     TradesContents `json:"contents"`
+}
+
+// TradesContents contains public trades for a market.
+type TradesContents struct {
+	Trades []Trade `json:"trades"`
+}
+
+// Trade contains one public market trade.
+type Trade struct {
+	ID              string `json:"id"`
+	CreatedAtHeight string `json:"createdAtHeight,omitempty"`
+	CreatedAt       string `json:"createdAt"`
+	Side            string `json:"side"`
+	Price           string `json:"price"`
+	Size            string `json:"size"`
+	Type            string `json:"type"`
 }
 
 type PriceLevel struct {
