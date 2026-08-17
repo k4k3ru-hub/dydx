@@ -71,6 +71,49 @@ type TradesContents struct {
 	Trades []Trade `json:"trades"`
 }
 
+// UnmarshalJSON decodes single or batched trade contents and flattens trades in receive order.
+//
+// Version:
+//   - 2026-08-17: Added support for batched trade contents.
+func (c *TradesContents) UnmarshalJSON(data []byte) error {
+	if c == nil {
+		return fmt.Errorf("failed to decode trades contents: target=null")
+	}
+	*c = TradesContents{}
+
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 {
+		return fmt.Errorf("failed to decode trades contents: value=empty")
+	}
+	if bytes.Equal(data, []byte("null")) {
+		return fmt.Errorf("failed to decode trades contents: value=null")
+	}
+
+	type tradesContents TradesContents
+	switch data[0] {
+	case '{':
+		var contents tradesContents
+		if err := json.Unmarshal(data, &contents); err != nil {
+			return fmt.Errorf("failed to decode trades contents object: %w", err)
+		}
+		*c = TradesContents(contents)
+		return nil
+	case '[':
+		var batches []tradesContents
+		if err := json.Unmarshal(data, &batches); err != nil {
+			return fmt.Errorf("failed to decode batched trades contents: %w", err)
+		}
+		trades := make([]Trade, 0)
+		for _, batch := range batches {
+			trades = append(trades, batch.Trades...)
+		}
+		c.Trades = trades
+		return nil
+	default:
+		return fmt.Errorf("failed to decode trades contents: value=invalid")
+	}
+}
+
 // Trade contains one public market trade.
 type Trade struct {
 	ID              string `json:"id"`
