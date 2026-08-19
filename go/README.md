@@ -20,6 +20,7 @@ import (
 	"log"
 
 	"github.com/k4k3ru-hub/dydx/go/rest"
+	"github.com/k4k3ru-hub/dydx/go/rest/markets/historical_funding"
 	"github.com/k4k3ru-hub/dydx/go/rest/markets/order_book"
 	"github.com/k4k3ru-hub/dydx/go/rest/markets/perpetual_markets"
 )
@@ -47,6 +48,15 @@ func main() {
 		log.Fatal(err)
 	}
 	fmt.Println(book.Bids[0], book.Asks[0])
+
+	funding, err := client.Markets().HistoricalFunding().Send(
+		context.Background(),
+		historical_funding.Params{Market: "BTC-USD", Limit: 100},
+	)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Println(funding.HistoricalFunding[0].Rate)
 }
 ```
 

@@ -2,7 +2,8 @@
 package endpoint
 
 const (
-	DefaultBaseURL       = "https://indexer.dydx.trade"
-	PerpetualMarketsPath = "/v4/perpetualMarkets"
-	OrderBookPathPrefix  = "/v4/orderbooks/perpetualMarket/"
+	DefaultBaseURL              = "https://indexer.dydx.trade"
+	PerpetualMarketsPath        = "/v4/perpetualMarkets"
+	OrderBookPathPrefix         = "/v4/orderbooks/perpetualMarket/"
+	HistoricalFundingPathPrefix = "/v4/historicalFunding/"
 )

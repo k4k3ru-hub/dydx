@@ -4,14 +4,16 @@ package markets
 import (
 	"fmt"
 
+	"github.com/k4k3ru-hub/dydx/go/rest/markets/historical_funding"
 	"github.com/k4k3ru-hub/dydx/go/rest/markets/order_book"
 	"github.com/k4k3ru-hub/dydx/go/rest/markets/perpetual_markets"
 	"github.com/k4k3ru-hub/dydx/go/rest/transport"
 )
 
 type Client struct {
-	perpetualMarkets *perpetual_markets.Client
-	orderBook        *order_book.Client
+	perpetualMarkets  *perpetual_markets.Client
+	orderBook         *order_book.Client
+	historicalFunding *historical_funding.Client
 }
 
 // NewClient creates a Markets API client.
@@ -27,7 +29,15 @@ func NewClient(executor transport.Executor) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to create markets client: %w", err)
 	}
-	return &Client{perpetualMarkets: perpetualMarketsClient, orderBook: orderBookClient}, nil
+	historicalFundingClient, err := historical_funding.NewClient(executor)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create markets client: %w", err)
+	}
+	return &Client{
+		perpetualMarkets:  perpetualMarketsClient,
+		orderBook:         orderBookClient,
+		historicalFunding: historicalFundingClient,
+	}, nil
 }
 
 // PerpetualMarkets returns the perpetual-markets operation client.
@@ -44,4 +54,15 @@ func (c *Client) OrderBook() *order_book.Client {
 		return nil
 	}
 	return c.orderBook
+}
+
+// HistoricalFunding returns the historical-funding operation client.
+//
+// Version:
+//   - 2026-08-19: Added.
+func (c *Client) HistoricalFunding() *historical_funding.Client {
+	if c == nil {
+		return nil
+	}
+	return c.historicalFunding
 }

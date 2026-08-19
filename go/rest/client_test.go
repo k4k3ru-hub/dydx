@@ -44,3 +44,15 @@ func TestDoReturnsTypedResponseError(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestNewClientComposesMarketOperations(t *testing.T) {
+	client, err := NewClient(&ClientOption{HTTPClient: roundTripFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{}`))}, nil
+	})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if client.Markets() == nil || client.Markets().PerpetualMarkets() == nil || client.Markets().OrderBook() == nil || client.Markets().HistoricalFunding() == nil {
+		t.Fatal("expected composed market operation clients")
+	}
+}
