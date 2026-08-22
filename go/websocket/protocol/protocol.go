@@ -48,11 +48,62 @@ type OrderBookMessage struct {
 	Contents     OrderBookContents `json:"contents"`
 }
 
-// OrderBookContents contains bid and ask changes. Snapshot levels are objects;
-// incremental levels are tuples. PriceLevel accepts both wire representations.
+// OrderBookContents contains bid and ask changes in receive order. Batches has
+// one entry for ordinary contents and preserves every entry for batched contents.
 type OrderBookContents struct {
+	Bids    []PriceLevel     `json:"bids"`
+	Asks    []PriceLevel     `json:"asks"`
+	Batches []OrderBookBatch `json:"-"`
+}
+
+// OrderBookBatch contains one atomic group of bid and ask changes.
+type OrderBookBatch struct {
 	Bids []PriceLevel `json:"bids"`
 	Asks []PriceLevel `json:"asks"`
+}
+
+// UnmarshalJSON decodes single or batched order book contents while preserving batch order.
+//
+// Version:
+//   - 2026-08-22: Added support for batched order book contents.
+func (c *OrderBookContents) UnmarshalJSON(data []byte) error {
+	if c == nil {
+		return fmt.Errorf("failed to decode order book contents: target=null")
+	}
+	*c = OrderBookContents{}
+
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 {
+		return fmt.Errorf("failed to decode order book contents: value=empty")
+	}
+	if bytes.Equal(data, []byte("null")) {
+		return fmt.Errorf("failed to decode order book contents: value=null")
+	}
+
+	switch data[0] {
+	case '{':
+		var batch OrderBookBatch
+		if err := json.Unmarshal(data, &batch); err != nil {
+			return fmt.Errorf("failed to decode order book contents object: %w", err)
+		}
+		c.Bids = batch.Bids
+		c.Asks = batch.Asks
+		c.Batches = []OrderBookBatch{batch}
+		return nil
+	case '[':
+		var batches []OrderBookBatch
+		if err := json.Unmarshal(data, &batches); err != nil {
+			return fmt.Errorf("failed to decode batched order book contents: %w", err)
+		}
+		c.Batches = batches
+		for _, batch := range batches {
+			c.Bids = append(c.Bids, batch.Bids...)
+			c.Asks = append(c.Asks, batch.Asks...)
+		}
+		return nil
+	default:
+		return fmt.Errorf("failed to decode order book contents: value=invalid")
+	}
 }
 
 // TradesMessage is a typed v4_trades message.

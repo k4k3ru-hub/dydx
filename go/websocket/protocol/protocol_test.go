@@ -11,8 +11,34 @@ func TestOrderBookMessageAcceptsSnapshotAndIncrementalLevels(t *testing.T) {
 	if err := json.Unmarshal(payload, &message); err != nil {
 		t.Fatal(err)
 	}
-	if message.Contents.Bids[0].Price != "100" || message.Contents.Asks[0].Offset != "9" {
+	if message.Contents.Bids[0].Price != "100" || message.Contents.Asks[0].Offset != "9" || len(message.Contents.Batches) != 1 {
 		t.Fatalf("unexpected message: %+v", message)
+	}
+}
+
+func TestOrderBookMessageDecodesBatchedContentsInReceiveOrder(t *testing.T) {
+	payload := []byte(`{"type":"channel_data","channel":"v4_orderbook","id":"BTC-USD","message_id":8,"contents":[{"bids":[["100","0"]],"asks":[]},{"bids":[],"asks":[["99","2"]]}]}`)
+	var message OrderBookMessage
+	if err := json.Unmarshal(payload, &message); err != nil {
+		t.Fatal(err)
+	}
+	if len(message.Contents.Batches) != 2 {
+		t.Fatalf("batches = %d, want 2", len(message.Contents.Batches))
+	}
+	if message.Contents.Batches[0].Bids[0].Price != "100" || message.Contents.Batches[1].Asks[0].Price != "99" {
+		t.Fatalf("unexpected batches: %+v", message.Contents.Batches)
+	}
+	if len(message.Contents.Bids) != 1 || len(message.Contents.Asks) != 1 {
+		t.Fatalf("unexpected flattened contents: %+v", message.Contents)
+	}
+}
+
+func TestOrderBookContentsRejectsInvalidValues(t *testing.T) {
+	for _, payload := range []string{"", "null", "1", `"orderbook"`, "[{"} {
+		var contents OrderBookContents
+		if err := contents.UnmarshalJSON([]byte(payload)); err == nil {
+			t.Fatalf("UnmarshalJSON(%q) error = nil", payload)
+		}
 	}
 }
 
