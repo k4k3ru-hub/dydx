@@ -155,3 +155,57 @@ func TestTradesMessageDecodeReuseClearsPreviousTrades(t *testing.T) {
 		t.Fatalf("unexpected trades: %+v", message.Contents.Trades)
 	}
 }
+
+func TestMarketsInitialMessageDecodesFundingOpenInterestAndOraclePrice(t *testing.T) {
+	payload := []byte(`{"type":"subscribed","channel":"v4_markets","message_id":1,"contents":{"markets":{"BTC-USD":{"clobPairId":"0","ticker":"BTC-USD","status":"ACTIVE","oraclePrice":"60000.25","priceChange24H":"125.5","volume24H":"1000000","trades24H":321,"nextFundingRate":"0.0000125","initialMarginFraction":"0.05","maintenanceMarginFraction":"0.03","openInterest":"123.456789","atomicResolution":-10,"quantumConversionExponent":-9,"tickSize":"1","stepSize":"0.0001","stepBaseQuantums":1000000,"subticksPerTick":100000,"marketType":"CROSS","openInterestLowerCap":"1000000","openInterestUpperCap":"10000000","baseOpenInterest":"10","defaultFundingRate1H":"0"}}}}`)
+	var message MarketsInitialMessage
+	if err := json.Unmarshal(payload, &message); err != nil {
+		t.Fatal(err)
+	}
+	market := message.Contents.Markets["BTC-USD"]
+	if market.NextFundingRate != "0.0000125" || market.OpenInterest != "123.456789" || market.OraclePrice != "60000.25" || market.DefaultFundingRate1H != "0" {
+		t.Fatalf("unexpected initial market: %+v", market)
+	}
+}
+
+func TestMarketsUpdateMessageDecodesFullPayload(t *testing.T) {
+	payload := []byte(`{"type":"channel_data","channel":"v4_markets","message_id":2,"contents":{"trading":{"BTC-USD":{"id":"0","clobPairId":"0","ticker":"BTC-USD","status":"ACTIVE","baseAsset":"BTC","quoteAsset":"USD","marketId":0,"priceChange24H":"125.5","volume24H":"1000000","trades24H":321,"nextFundingRate":"0.000015","openInterest":"124.000001","baseOpenInterest":"10","basePositionSize":"1","incrementalPositionSize":"0.1","maxPositionSize":"1000","initialMarginFraction":"0.05","maintenanceMarginFraction":"0.03","atomicResolution":-10,"quantumConversionExponent":-9,"stepBaseQuantums":1000000,"subticksPerTick":100000}},"oraclePrices":{"BTC-USD":{"marketId":0,"oraclePrice":"60001.75","effectiveAt":"2026-08-27T00:00:00.000Z","effectiveAtHeight":"123456"}}}}`)
+	var message MarketsUpdateMessage
+	if err := json.Unmarshal(payload, &message); err != nil {
+		t.Fatal(err)
+	}
+	market := message.Contents.Trading["BTC-USD"]
+	oracle := message.Contents.OraclePrices["BTC-USD"]
+	if market.NextFundingRate != "0.000015" || market.OpenInterest != "124.000001" || market.BaseAsset != "BTC" {
+		t.Fatalf("unexpected trading update: %+v", market)
+	}
+	if oracle.OraclePrice != "60001.75" || oracle.EffectiveAt != "2026-08-27T00:00:00.000Z" || oracle.EffectiveAtHeight != "123456" {
+		t.Fatalf("unexpected oracle update: %+v", oracle)
+	}
+	if len(message.Contents.Batches) != 1 {
+		t.Fatalf("batches = %d, want 1", len(message.Contents.Batches))
+	}
+}
+
+func TestMarketsUpdateMessageDecodesBatchedContents(t *testing.T) {
+	payload := []byte(`{"contents":[{"trading":{"BTC-USD":{"nextFundingRate":"0.00001","openInterest":"100"}}},{"trading":{"BTC-USD":{"nextFundingRate":"0.00002","openInterest":"101"}},"oraclePrices":{"BTC-USD":{"oraclePrice":"60002","effectiveAt":"2026-08-27T00:01:00.000Z","effectiveAtHeight":"123457"}}}]}`)
+	var message MarketsUpdateMessage
+	if err := json.Unmarshal(payload, &message); err != nil {
+		t.Fatal(err)
+	}
+	if len(message.Contents.Batches) != 2 {
+		t.Fatalf("batches = %d, want 2", len(message.Contents.Batches))
+	}
+	if message.Contents.Trading["BTC-USD"].OpenInterest != "101" || message.Contents.OraclePrices["BTC-USD"].OraclePrice != "60002" {
+		t.Fatalf("unexpected flattened update: %+v", message.Contents)
+	}
+}
+
+func TestMarketsUpdateContentsRejectsInvalidValues(t *testing.T) {
+	for _, payload := range []string{"", "null", "1", `"markets"`, "[{"} {
+		var contents MarketsUpdateContents
+		if err := contents.UnmarshalJSON([]byte(payload)); err == nil {
+			t.Fatalf("UnmarshalJSON(%q) error = nil", payload)
+		}
+	}
+}

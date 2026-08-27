@@ -31,6 +31,9 @@ func TestNewClientComposesSubscriptionsAndPreservesOptions(t *testing.T) {
 	if client.Trades() == nil {
 		t.Fatal("expected composed trades client")
 	}
+	if client.Markets() == nil {
+		t.Fatal("expected composed markets client")
+	}
 	if option.HTTPHeader.Get("X-Test") != "original" {
 		t.Fatalf("caller-owned option was modified: %+v", option)
 	}

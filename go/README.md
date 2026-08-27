@@ -91,6 +91,10 @@ err = client.Trades().Subscribe(ctx, subscriptions.TradesParams{
 	Market:  "BTC-USD",
 	Batched: false,
 })
+
+err = client.Markets().Subscribe(ctx, subscriptions.MarketsParams{
+	Batched: true,
+})
 ```
 
 Decode order-book events into `protocol.OrderBookMessage` from
@@ -102,3 +106,17 @@ snapshot objects (`{"price":"...","size":"..."}`) and incremental tuples
 Decode trade events into `protocol.TradesMessage`. Each entry in
 `Contents.Trades` contains the trade ID, creation time and height, side, price,
 size, and type.
+
+The `v4_markets` channel does not use a market ID because it streams all dYdX
+markets. Decode its initial snapshot into `protocol.MarketsInitialMessage` and
+incremental updates into `protocol.MarketsUpdateMessage`. The initial snapshot
+contains `nextFundingRate`, `openInterest`, and `oraclePrice`. Incremental
+`trading` updates contain the current funding estimate and open interest, while
+`oraclePrices` updates include the oracle price, effective time, and block
+height.
+
+For startup state, use REST `PerpetualMarkets`; use `v4_markets` for subsequent
+updates and REST `HistoricalFunding` for settled funding records. Values remain
+decimal strings so consumers can normalize them without losing precision.
+`oraclePrice` is an oracle price and must not be labeled as an exchange mark
+price. Dataset conversion and timestamp policy belong to the consuming service.

@@ -16,13 +16,14 @@ const (
 
 	ChannelOrderBook = "v4_orderbook"
 	ChannelTrades    = "v4_trades"
+	ChannelMarkets   = "v4_markets"
 )
 
 // Request is a dYdX Indexer WebSocket subscription request.
 type Request struct {
 	Type    string `json:"type"`
 	Channel string `json:"channel"`
-	ID      string `json:"id"`
+	ID      string `json:"id,omitempty"`
 	Batched *bool  `json:"batched,omitempty"`
 }
 
@@ -120,6 +121,155 @@ type TradesMessage struct {
 // TradesContents contains public trades for a market.
 type TradesContents struct {
 	Trades []Trade `json:"trades"`
+}
+
+// MarketsInitialMessage is a typed initial v4_markets message.
+type MarketsInitialMessage struct {
+	Type         string                 `json:"type"`
+	ConnectionID string                 `json:"connection_id,omitempty"`
+	Channel      string                 `json:"channel,omitempty"`
+	MessageID    int64                  `json:"message_id,omitempty"`
+	Version      string                 `json:"version,omitempty"`
+	Contents     MarketsInitialContents `json:"contents"`
+}
+
+// MarketsInitialContents contains the initial snapshot of all perpetual markets.
+type MarketsInitialContents struct {
+	Markets map[string]PerpetualMarket `json:"markets"`
+}
+
+// MarketsUpdateMessage is a typed incremental v4_markets message.
+type MarketsUpdateMessage struct {
+	Type         string                `json:"type"`
+	ConnectionID string                `json:"connection_id,omitempty"`
+	Channel      string                `json:"channel,omitempty"`
+	MessageID    int64                 `json:"message_id,omitempty"`
+	Version      string                `json:"version,omitempty"`
+	Contents     MarketsUpdateContents `json:"contents"`
+}
+
+// MarketsUpdateContents contains trading and oracle-price market updates.
+// Batches preserves the receive order when dYdX batches multiple updates.
+type MarketsUpdateContents struct {
+	Trading      map[string]TradingPerpetualMarket `json:"trading,omitempty"`
+	OraclePrices map[string]OraclePriceMarket      `json:"oraclePrices,omitempty"`
+	Batches      []MarketsUpdateBatch              `json:"-"`
+}
+
+// MarketsUpdateBatch contains one atomic market update.
+type MarketsUpdateBatch struct {
+	Trading      map[string]TradingPerpetualMarket `json:"trading,omitempty"`
+	OraclePrices map[string]OraclePriceMarket      `json:"oraclePrices,omitempty"`
+}
+
+// UnmarshalJSON decodes single or batched market updates in receive order.
+//
+// Version:
+//   - 2026-08-27: Added.
+func (c *MarketsUpdateContents) UnmarshalJSON(data []byte) error {
+	if c == nil {
+		return fmt.Errorf("failed to decode markets update contents: target=null")
+	}
+	*c = MarketsUpdateContents{}
+
+	data = bytes.TrimSpace(data)
+	if len(data) == 0 {
+		return fmt.Errorf("failed to decode markets update contents: value=empty")
+	}
+	if bytes.Equal(data, []byte("null")) {
+		return fmt.Errorf("failed to decode markets update contents: value=null")
+	}
+
+	switch data[0] {
+	case '{':
+		var batch MarketsUpdateBatch
+		if err := json.Unmarshal(data, &batch); err != nil {
+			return fmt.Errorf("failed to decode markets update contents object: %w", err)
+		}
+		c.Trading = batch.Trading
+		c.OraclePrices = batch.OraclePrices
+		c.Batches = []MarketsUpdateBatch{batch}
+		return nil
+	case '[':
+		var batches []MarketsUpdateBatch
+		if err := json.Unmarshal(data, &batches); err != nil {
+			return fmt.Errorf("failed to decode batched markets update contents: %w", err)
+		}
+		c.Batches = batches
+		c.Trading = make(map[string]TradingPerpetualMarket)
+		c.OraclePrices = make(map[string]OraclePriceMarket)
+		for _, batch := range batches {
+			for ticker, market := range batch.Trading {
+				c.Trading[ticker] = market
+			}
+			for ticker, market := range batch.OraclePrices {
+				c.OraclePrices[ticker] = market
+			}
+		}
+		return nil
+	default:
+		return fmt.Errorf("failed to decode markets update contents: value=invalid")
+	}
+}
+
+// PerpetualMarket contains a dYdX perpetual-market snapshot.
+type PerpetualMarket struct {
+	ClobPairID                string `json:"clobPairId"`
+	Ticker                    string `json:"ticker"`
+	Status                    string `json:"status"`
+	OraclePrice               string `json:"oraclePrice"`
+	PriceChange24H            string `json:"priceChange24H"`
+	Volume24H                 string `json:"volume24H"`
+	Trades24H                 int    `json:"trades24H"`
+	NextFundingRate           string `json:"nextFundingRate"`
+	InitialMarginFraction     string `json:"initialMarginFraction"`
+	MaintenanceMarginFraction string `json:"maintenanceMarginFraction"`
+	OpenInterest              string `json:"openInterest"`
+	AtomicResolution          int    `json:"atomicResolution"`
+	QuantumConversionExponent int    `json:"quantumConversionExponent"`
+	TickSize                  string `json:"tickSize"`
+	StepSize                  string `json:"stepSize"`
+	StepBaseQuantums          int64  `json:"stepBaseQuantums"`
+	SubticksPerTick           int64  `json:"subticksPerTick"`
+	MarketType                string `json:"marketType"`
+	OpenInterestLowerCap      string `json:"openInterestLowerCap"`
+	OpenInterestUpperCap      string `json:"openInterestUpperCap"`
+	BaseOpenInterest          string `json:"baseOpenInterest"`
+	DefaultFundingRate1H      string `json:"defaultFundingRate1H"`
+}
+
+// TradingPerpetualMarket contains mutable perpetual-market fields.
+type TradingPerpetualMarket struct {
+	ID                        string `json:"id"`
+	ClobPairID                string `json:"clobPairId"`
+	Ticker                    string `json:"ticker"`
+	Status                    string `json:"status"`
+	BaseAsset                 string `json:"baseAsset"`
+	QuoteAsset                string `json:"quoteAsset"`
+	MarketID                  int64  `json:"marketId"`
+	PriceChange24H            string `json:"priceChange24H"`
+	Volume24H                 string `json:"volume24H"`
+	Trades24H                 int64  `json:"trades24H"`
+	NextFundingRate           string `json:"nextFundingRate"`
+	OpenInterest              string `json:"openInterest"`
+	BaseOpenInterest          string `json:"baseOpenInterest"`
+	BasePositionSize          string `json:"basePositionSize"`
+	IncrementalPositionSize   string `json:"incrementalPositionSize"`
+	MaxPositionSize           string `json:"maxPositionSize"`
+	InitialMarginFraction     string `json:"initialMarginFraction"`
+	MaintenanceMarginFraction string `json:"maintenanceMarginFraction"`
+	AtomicResolution          int    `json:"atomicResolution"`
+	QuantumConversionExponent int    `json:"quantumConversionExponent"`
+	StepBaseQuantums          int64  `json:"stepBaseQuantums"`
+	SubticksPerTick           int64  `json:"subticksPerTick"`
+}
+
+// OraclePriceMarket contains one oracle-price update.
+type OraclePriceMarket struct {
+	MarketID          int64  `json:"marketId"`
+	OraclePrice       string `json:"oraclePrice"`
+	EffectiveAt       string `json:"effectiveAt"`
+	EffectiveAtHeight string `json:"effectiveAtHeight"`
 }
 
 // UnmarshalJSON decodes single or batched trade contents and flattens trades in receive order.
