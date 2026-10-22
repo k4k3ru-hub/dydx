@@ -120,3 +120,10 @@ updates and REST `HistoricalFunding` for settled funding records. Values remain
 decimal strings so consumers can normalize them without losing precision.
 `oraclePrice` is an oracle price and must not be labeled as an exchange mark
 price. Dataset conversion and timestamp policy belong to the consuming service.
+
+## Go toolchain
+
+Development and verification use Go 1.27.3. The module minimum Go version is
+unchanged. The `toolchain` directive selects Go when working in this module;
+consuming applications must select a patched Go toolchain and rebuild to receive
+TLS security fixes.
