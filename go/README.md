@@ -65,7 +65,9 @@ The default REST endpoint is `https://indexer.dydx.trade`.
 ## WebSocket market data
 
 Implement `websocket.SessionHandler`, construct a client, then subscribe. The
-example imports the required packages directly:
+example imports the required packages directly and enables `permessage-deflate`
+for endpoints that require compression. Compression remains disabled when the
+option is omitted:
 
 ```go
 import (
@@ -73,7 +75,9 @@ import (
 	"github.com/k4k3ru-hub/dydx/go/websocket/subscriptions"
 )
 
-client, err := websocket.NewClient(ctx, websocket.DefaultEndpointURL, handler, nil)
+option := websocket.DefaultClientOption()
+option.EnableCompression = true
+client, err := websocket.NewClient(ctx, websocket.DefaultEndpointURL, handler, option)
 if err != nil {
 	return err
 }

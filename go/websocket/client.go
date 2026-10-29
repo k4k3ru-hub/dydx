@@ -28,6 +28,19 @@ func DefaultClientOption() *ClientOption {
 	return option
 }
 
+// NewClient composes the dYdX WebSocket transport and subscription clients.
+//
+// Parameters:
+//   - ctx: Application context.
+//   - endpointURL: Endpoint used when option does not specify an endpoint.
+//   - handler: Required inbound session handler.
+//   - option: Caller-owned transport options, or nil for defaults.
+//
+// Returns:
+//   - Composed client, or a construction error.
+//
+// Version:
+//   - 2026-10-29: Preserve opt-in compression when cloning transport options.
 func NewClient(ctx context.Context, endpointURL string, handler SessionHandler, option *ClientOption) (*Client, error) {
 	if handler == nil {
 		return nil, fmt.Errorf("failed to create client: missing required parameter: session_handler=null")
@@ -69,7 +82,8 @@ func cloneClientOption(option *ClientOption) *ClientOption {
 	}
 	cloned := &ClientOption{
 		EndpointURL: option.EndpointURL, ConnectTimeout: option.ConnectTimeout,
-		HandshakeTimeout: option.HandshakeTimeout,
+		HandshakeTimeout:  option.HandshakeTimeout,
+		EnableCompression: option.EnableCompression,
 	}
 	if option.HTTPHeader != nil {
 		cloned.HTTPHeader = option.HTTPHeader.Clone()
